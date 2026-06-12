@@ -437,16 +437,47 @@ function setupTrackCardListeners() {
   });
 }
 
-// 3. Database State Loading/Saving
-function loadStateFromStorage() {
-  const storedStudent = localStorage.getItem("lms_student");
-  const storedProgress = localStorage.getItem("lms_progress");
-  const storedQuiz = localStorage.getItem("lms_quiz_results");
+// 3. Database State Loading/Saving & User Helper Functions
+function loadUsersFromStorage() {
+  const storedUsers = localStorage.getItem("lms_users");
+  return storedUsers ? JSON.parse(storedUsers) : [];
+}
 
-  if (storedStudent) {
-    student = JSON.parse(storedStudent);
-    progress = storedProgress ? JSON.parse(storedProgress) : [];
-    quizResults = storedQuiz ? JSON.parse(storedQuiz) : [];
+function getSafeUserSuffix() {
+  const email = localStorage.getItem("lms_current_user");
+  return email ? email.toLowerCase().replace(/[^a-z0-9]/g, "_") : "";
+}
+
+function loadStateFromStorage() {
+  const currentUserEmail = localStorage.getItem("lms_current_user");
+  if (currentUserEmail) {
+    const suffix = getSafeUserSuffix();
+    const storedStudent = localStorage.getItem(`lms_student_${suffix}`);
+    const storedProgress = localStorage.getItem(`lms_progress_${suffix}`);
+    const storedQuiz = localStorage.getItem(`lms_quiz_${suffix}`);
+
+    if (storedStudent) {
+      student = JSON.parse(storedStudent);
+      progress = storedProgress ? JSON.parse(storedProgress) : [];
+      quizResults = storedQuiz ? JSON.parse(storedQuiz) : [];
+    } else {
+      // Fallback: Initialize student details if user is authenticated but state is empty
+      const users = loadUsersFromStorage();
+      const userObj = users.find(u => u.email.toLowerCase() === currentUserEmail.toLowerCase());
+      if (userObj) {
+        student = {
+          id: userObj.id || 1,
+          name: userObj.name,
+          email: userObj.email,
+          selected_track_id: null,
+          enrolled_at: new Date().toISOString()
+        };
+      } else {
+        student = null;
+      }
+      progress = [];
+      quizResults = [];
+    }
   } else {
     student = null;
     progress = [];
@@ -455,14 +486,12 @@ function loadStateFromStorage() {
 }
 
 function saveStateToStorage() {
-  if (student) {
-    localStorage.setItem("lms_student", JSON.stringify(student));
-    localStorage.setItem("lms_progress", JSON.stringify(progress));
-    localStorage.setItem("lms_quiz_results", JSON.stringify(quizResults));
-  } else {
-    localStorage.removeItem("lms_student");
-    localStorage.removeItem("lms_progress");
-    localStorage.removeItem("lms_quiz_results");
+  const currentUserEmail = localStorage.getItem("lms_current_user");
+  if (currentUserEmail && student) {
+    const suffix = getSafeUserSuffix();
+    localStorage.setItem(`lms_student_${suffix}`, JSON.stringify(student));
+    localStorage.setItem(`lms_progress_${suffix}`, JSON.stringify(progress));
+    localStorage.setItem(`lms_quiz_${suffix}`, JSON.stringify(quizResults));
   }
   updateDbJsonViewer();
 }
@@ -563,10 +592,11 @@ function renderApp() {
     trackArea.style.display = "none";
     dashboardArea.style.display = "none";
     
-    // Reset inputs
-    document.getElementById("login-name").value = "";
-    document.getElementById("login-email").value = "";
-    document.getElementById("login-password").value = "";
+    // Reset inputs safely
+    const loginEmailEl = document.getElementById("login-email");
+    if (loginEmailEl) loginEmailEl.value = "";
+    const loginPassEl = document.getElementById("login-password");
+    if (loginPassEl) loginPassEl.value = "";
   } else if (student && student.selected_track_id === null) {
     // State 2: Logged in but track not selected
     loginArea.style.display = "none";
@@ -592,30 +622,231 @@ function renderApp() {
   }
 }
 
+// Authentication Form Switching
+function toggleAuthMode(mode, event) {
+  if (event) event.preventDefault();
+
+  const loginView = document.getElementById("login-form-view");
+  const signupView = document.getElementById("signup-form-view");
+  const forgotView = document.getElementById("forgot-form-view");
+
+  if (loginView) loginView.style.display = "none";
+  if (signupView) signupView.style.display = "none";
+  if (forgotView) forgotView.style.display = "none";
+
+  if (mode === "signup") {
+    if (signupView) signupView.style.display = "block";
+  } else if (mode === "forgot") {
+    if (forgotView) forgotView.style.display = "block";
+    const stepEmail = document.getElementById("forgot-step-email");
+    const stepReset = document.getElementById("forgot-step-reset");
+    const forgotEmail = document.getElementById("forgot-email");
+    if (stepEmail) stepEmail.style.display = "block";
+    if (stepReset) stepReset.style.display = "none";
+    if (forgotEmail) forgotEmail.value = "";
+  } else {
+    if (loginView) loginView.style.display = "block";
+  }
+}
+
 // Portal Login Action
 function loginStudent() {
-  const nameInput = document.getElementById("login-name").value.trim();
   const emailInput = document.getElementById("login-email").value.trim();
   const passInput = document.getElementById("login-password").value;
 
-  if (!nameInput || !emailInput || !passInput) {
-    alert("Please fill in your name, email, and password!");
+  if (!emailInput || !passInput) {
+    alert("Please enter both your email address and password!");
     return;
   }
 
-  // Create partial Student record
-  student = {
-    id: 1,
+  const users = loadUsersFromStorage();
+  const user = users.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+
+  if (!user) {
+    alert("User does not exist! Please create an account first.");
+    toggleAuthMode("signup");
+    const signupEmail = document.getElementById("signup-email");
+    if (signupEmail) signupEmail.value = emailInput;
+    return;
+  }
+
+  if (user.password !== passInput) {
+    alert("Incorrect password! Please try again.");
+    return;
+  }
+
+  // Authenticate session
+  localStorage.setItem("lms_current_user", user.email);
+  loadStateFromStorage();
+
+  // Redirect based on whether track selection is complete
+  const targetScreen = (student && student.selected_track_id !== null) ? "dashboard-area" : "track-area";
+
+  transitionToScreen("login-area", targetScreen, () => {
+    renderApp();
+  });
+}
+
+// Student Registration Action
+function signupStudent() {
+  const nameInput = document.getElementById("signup-name").value.trim();
+  const emailInput = document.getElementById("signup-email").value.trim();
+  const passInput = document.getElementById("signup-password").value;
+  const trackSelect = document.getElementById("signup-track");
+  const trackIdVal = trackSelect ? trackSelect.value : "";
+
+  if (!nameInput || !emailInput || !passInput || !trackIdVal) {
+    alert("Please fill in all registration fields, including your preferred learning track!");
+    return;
+  }
+
+  if (!emailInput.includes("@")) {
+    alert("Please enter a valid email address!");
+    return;
+  }
+
+  const users = loadUsersFromStorage();
+  const existingUser = users.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+
+  if (existingUser) {
+    alert("An account with this email already exists! Please log in.");
+    toggleAuthMode("login");
+    const loginEmail = document.getElementById("login-email");
+    if (loginEmail) loginEmail.value = emailInput;
+    return;
+  }
+
+  // Create new credentials
+  const newUser = {
+    id: users.length + 1,
     name: nameInput,
     email: emailInput,
-    selected_track_id: null,
+    password: passInput,
+    created_at: new Date().toISOString()
+  };
+
+  users.push(newUser);
+  localStorage.setItem("lms_users", JSON.stringify(users));
+
+  // Log user in automatically
+  localStorage.setItem("lms_current_user", emailInput);
+
+  // Initialize student profile
+  const trackId = parseInt(trackIdVal);
+  student = {
+    id: newUser.id,
+    name: newUser.name,
+    email: newUser.email,
+    selected_track_id: trackId,
     enrolled_at: new Date().toISOString()
   };
 
+  // Pre-generate learning path records
+  progress = [];
+  const selectedTrack = TRACKS_DB.find(t => t.id === trackId);
+  let progressIdCounter = 1;
+
+  selectedTrack.modules.forEach(mod => {
+    mod.lessons.forEach(lesson => {
+      const isFirst = (mod.sequence_order === 1 && lesson.sequence_order === 1);
+      progress.push({
+        id: progressIdCounter++,
+        student_id: student.id,
+        module_id: mod.id,
+        lesson_id: lesson.id,
+        status: isFirst ? "active" : "locked",
+        completed_at: null
+      });
+    });
+  });
+
+  quizResults = [];
+
   saveStateToStorage();
-  transitionToScreen("login-area", "track-area", () => {
+
+  // Reset forms
+  document.getElementById("signup-name").value = "";
+  document.getElementById("signup-email").value = "";
+  document.getElementById("signup-password").value = "";
+  if (trackSelect) trackSelect.selectedIndex = 0;
+
+  alert(`Welcome, ${nameInput}! Your account has been created and your roadmap is generated.`);
+  transitionToScreen("login-area", "dashboard-area", () => {
     renderApp();
   });
+}
+
+// Forgot Password Flow
+let verifiedForgotEmailStr = "";
+
+function verifyForgotEmail() {
+  const emailInput = document.getElementById("forgot-email").value.trim();
+  if (!emailInput) {
+    alert("Please enter your registered email address!");
+    return;
+  }
+
+  const users = loadUsersFromStorage();
+  const user = users.find(u => u.email.toLowerCase() === emailInput.toLowerCase());
+
+  if (!user) {
+    alert("This email address is not registered in our system.");
+    return;
+  }
+
+  verifiedForgotEmailStr = user.email;
+
+  const stepEmail = document.getElementById("forgot-step-email");
+  const stepReset = document.getElementById("forgot-step-reset");
+  if (stepEmail) stepEmail.style.display = "none";
+  if (stepReset) stepReset.style.display = "block";
+}
+
+function resetUserPassword() {
+  const newPass = document.getElementById("forgot-new-password").value;
+  const confirmPass = document.getElementById("forgot-confirm-password").value;
+
+  if (!newPass || !confirmPass) {
+    alert("Please fill in both password fields!");
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    alert("Passwords do not match! Please check and try again.");
+    return;
+  }
+
+  if (!verifiedForgotEmailStr) {
+    alert("Session error. Please start the password reset flow again.");
+    toggleAuthMode("login");
+    return;
+  }
+
+  const users = loadUsersFromStorage();
+  const userIdx = users.findIndex(u => u.email.toLowerCase() === verifiedForgotEmailStr.toLowerCase());
+
+  if (userIdx === -1) {
+    alert("Error finding the user record. Please try again.");
+    return;
+  }
+
+  users[userIdx].password = newPass;
+  localStorage.setItem("lms_users", JSON.stringify(users));
+
+  alert("Password updated successfully! Please log in with your new password.");
+
+  // Clear forgot password inputs
+  document.getElementById("forgot-email").value = "";
+  document.getElementById("forgot-new-password").value = "";
+  document.getElementById("forgot-confirm-password").value = "";
+  verifiedForgotEmailStr = "";
+
+  const stepEmail = document.getElementById("forgot-step-email");
+  const stepReset = document.getElementById("forgot-step-reset");
+  if (stepEmail) stepEmail.style.display = "block";
+  if (stepReset) stepReset.style.display = "none";
+
+  toggleAuthMode("login");
 }
 
 // Portal Logout Action
@@ -623,7 +854,8 @@ function logoutStudent() {
   student = null;
   progress = [];
   quizResults = [];
-  saveStateToStorage();
+  localStorage.removeItem("lms_current_user");
+  updateDbJsonViewer();
   
   // Decide which screen we're transitioning from
   const currentActiveEl = document.getElementById("track-area").style.display !== "none" ? "track-area" : "dashboard-area";
@@ -633,7 +865,24 @@ function logoutStudent() {
   });
 }
 
-// Onboarding: student selects track and generates roadmap
+// Switch track screen
+function switchToTrackSelection() {
+  transitionToScreen("dashboard-area", "track-area", () => {
+    if (student) {
+      document.getElementById("track-greeting").innerText = `Welcome, ${student.name}! Switch to or enroll in any track below.`;
+      
+      document.querySelectorAll(".track-card").forEach(c => {
+        c.classList.remove("selected");
+        if (parseInt(c.getAttribute("data-id")) === student.selected_track_id) {
+          c.classList.add("selected");
+        }
+      });
+      document.getElementById("btn-generate-path").removeAttribute("disabled");
+    }
+  });
+}
+
+// Onboarding/Track Enrollment: student selects track and generates/loads roadmap
 function onboardStudent() {
   const selectedCard = document.querySelector(".track-card.selected");
   if (!selectedCard || !student) {
@@ -644,28 +893,32 @@ function onboardStudent() {
   const trackId = parseInt(selectedCard.getAttribute("data-id"));
   student.selected_track_id = trackId;
 
-  // Generate Learning Path and initialize Progress records
-  progress = [];
   const selectedTrack = TRACKS_DB.find(t => t.id === trackId);
-  let progressIdCounter = 1;
+  const firstModuleId = selectedTrack.modules[0].id;
 
-  selectedTrack.modules.forEach(mod => {
-    mod.lessons.forEach(lesson => {
-      // Module 1, Lesson 1 is unlocked initially. Everything else is locked.
-      const isFirstLessonOfFirstModule = (mod.sequence_order === 1 && lesson.sequence_order === 1);
-      
-      progress.push({
-        id: progressIdCounter++,
-        student_id: student.id,
-        module_id: mod.id,
-        lesson_id: lesson.id,
-        status: isFirstLessonOfFirstModule ? "active" : "locked",
-        completed_at: null
+  // Check if this track is already initialized in progress
+  const alreadyInitialized = progress.some(p => p.module_id === firstModuleId);
+
+  if (!alreadyInitialized) {
+    // Generate new progress records and append to existing progress
+    let maxId = progress.reduce((max, p) => p.id > max ? p.id : max, 0);
+    
+    selectedTrack.modules.forEach(mod => {
+      mod.lessons.forEach(lesson => {
+        // Module 1, Lesson 1 is unlocked initially. Everything else is locked.
+        const isFirstLessonOfFirstModule = (mod.sequence_order === 1 && lesson.sequence_order === 1);
+        
+        progress.push({
+          id: ++maxId,
+          student_id: student.id,
+          module_id: mod.id,
+          lesson_id: lesson.id,
+          status: isFirstLessonOfFirstModule ? "active" : "locked",
+          completed_at: null
+        });
       });
     });
-  });
-
-  quizResults = [];
+  }
 
   saveStateToStorage();
   transitionToScreen("track-area", "dashboard-area", () => {
@@ -812,9 +1065,13 @@ function completeLesson(lessonId) {
 
 // Render Dashboard Metrics (Streaks, Completion %, next actions)
 function renderMetrics(track) {
-  const completedLessons = progress.filter(p => p.status === "completed").length;
-  const totalLessons = progress.length;
-  const progressPercentage = Math.round((completedLessons / totalLessons) * 100);
+  // Isolate metrics calculations to current active track
+  const trackModuleIds = track.modules.map(m => m.id);
+  const trackProgress = progress.filter(p => trackModuleIds.includes(p.module_id));
+
+  const completedLessons = trackProgress.filter(p => p.status === "completed").length;
+  const totalLessons = trackProgress.length;
+  const progressPercentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   // Update percentages
   document.getElementById("progress-percentage-label").innerText = `${progressPercentage}%`;
@@ -835,7 +1092,7 @@ function renderMetrics(track) {
   document.getElementById("metric-streak").innerText = `${streak} Days`;
 
   // Next Action suggestion
-  const nextActiveLesson = progress.find(p => p.status === "active");
+  const nextActiveLesson = trackProgress.find(p => p.status === "active");
   const nextActionBox = document.getElementById("next-action-box");
 
   if (nextActiveLesson) {
@@ -857,7 +1114,7 @@ function renderMetrics(track) {
   } else {
     // Check if there is an active quiz redirect
     const activeModuleQuizIdx = track.modules.findIndex(m => {
-      const modLessons = progress.filter(p => p.module_id === m.id);
+      const modLessons = trackProgress.filter(p => p.module_id === m.id);
       const lessonsDone = modLessons.every(p => p.status === "completed");
       const quizDone = quizResults.some(qr => qr.module_id === m.id && qr.passed);
       return lessonsDone && !quizDone;
@@ -1069,7 +1326,10 @@ function renderGraduationCelebration() {
         </div>
       </div>
 
-      <button class="btn btn-secondary" onclick="resetDatabaseState()">Reset and Try Another Track</button>
+      <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem;">
+        <button class="btn btn-primary" onclick="switchToTrackSelection()">Enroll in Another Track</button>
+        <button class="btn btn-secondary" onclick="resetDatabaseState()">Reset Current Track Data</button>
+      </div>
     </div>
   `;
 
@@ -1079,17 +1339,39 @@ function renderGraduationCelebration() {
   `;
 }
 
-// Reset Database state
+// Reset Database state (only resets current track history, leaving other courses intact)
 function resetDatabaseState() {
-  student = null;
-  progress = [];
-  quizResults = [];
-  saveStateToStorage();
-  
-  const fromEl = document.getElementById("dashboard-area").style.display !== "none" ? "dashboard-area" : "track-area";
-  transitionToScreen(fromEl, "login-area", () => {
-    renderApp();
+  if (!student || student.selected_track_id === null) return;
+
+  const trackId = student.selected_track_id;
+  const selectedTrack = TRACKS_DB.find(t => t.id === trackId);
+  const trackModuleIds = selectedTrack.modules.map(m => m.id);
+
+  // 1. Remove current track's progress records from the progress array
+  progress = progress.filter(p => !trackModuleIds.includes(p.module_id));
+
+  // 2. Remove current track's quiz results from the quizResults array
+  quizResults = quizResults.filter(q => !trackModuleIds.includes(q.module_id));
+
+  // 3. Re-initialize progress for the current track
+  let maxId = progress.reduce((max, p) => p.id > max ? p.id : max, 0);
+  selectedTrack.modules.forEach(mod => {
+    mod.lessons.forEach(lesson => {
+      const isFirst = (mod.sequence_order === 1 && lesson.sequence_order === 1);
+      progress.push({
+        id: ++maxId,
+        student_id: student.id,
+        module_id: mod.id,
+        lesson_id: lesson.id,
+        status: isFirst ? "active" : "locked",
+        completed_at: null
+      });
+    });
   });
+
+  saveStateToStorage();
+  renderApp();
+  alert("Current track progress has been reset successfully!");
 }
 
 // 7. Interactive Workflow Diagram state highlighting
