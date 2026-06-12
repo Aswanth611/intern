@@ -98,37 +98,139 @@
       <!-- 1. LMS PROTOTYPE TAB PANEL -->
       <section class="tab-panel active" id="prototype-panel">
         
-        <!-- Screen 1: Login Screen -->
+        <!-- Screen 1: Login / Sign Up Screen -->
         <div class="glass-card screen" id="login-area">
-          <div class="card-header">
-            <h3 class="card-title">
-              <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-              Student Portal Access
-            </h3>
-          </div>
           
-          <div style="max-width: 420px; margin: 0 auto; padding: 1rem 0;">
-            <div class="form-group">
-              <label class="form-label" for="login-name">Student Full Name</label>
-              <input type="text" class="form-input" id="login-name" placeholder="e.g. Akshay" required>
+          <!-- LOGIN VIEW -->
+          <div id="login-form-view">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                Portal Login
+              </h3>
             </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="login-email">Email Address</label>
-              <input type="email" class="form-input" id="login-email" placeholder="e.g. akshay@example.com" required>
-            </div>
+            <div style="max-width: 420px; margin: 0 auto; padding: 1rem 0;">
+              <div class="form-group">
+                <label class="form-label" for="login-email">Email Address</label>
+                <input type="email" class="form-input" id="login-email" placeholder="e.g. aswanth@example.com" required>
+              </div>
 
-            <div class="form-group">
-              <label class="form-label" for="login-password">Password</label>
-              <input type="password" class="form-input" id="login-password" placeholder="••••••••" required>
-            </div>
+              <div class="form-group" style="margin-bottom: 0.5rem;">
+                <label class="form-label" for="login-password">Password</label>
+                <input type="password" class="form-input" id="login-password" placeholder="••••••••" required>
+              </div>
 
-            <div style="margin-top: 1.75rem;">
-              <button class="btn btn-primary" style="width: 100%;" onclick="loginStudent()">
-                Sign In & Continue
-              </button>
+              <div style="text-align: right; margin-bottom: 1.5rem; font-size: 0.8rem;">
+                <a href="#" style="color: var(--text-secondary); text-decoration: none;" onclick="toggleAuthMode('forgot', event)">Forgot Password?</a>
+              </div>
+
+              <div style="margin-top: 1rem;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="loginStudent()">
+                  Sign In & Enter Portal
+                </button>
+              </div>
+              
+              <div style="text-align: center; margin-top: 1.25rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);">Don't have an account? </span>
+                <a href="#" style="color: var(--primary); font-weight: 600; text-decoration: none;" onclick="toggleAuthMode('signup', event)">Register Here</a>
+              </div>
             </div>
           </div>
+
+          <!-- SIGNUP VIEW -->
+          <div id="signup-form-view" style="display: none;">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                Create Account
+              </h3>
+            </div>
+            <div style="max-width: 420px; margin: 0 auto; padding: 1rem 0;">
+              <div class="form-group">
+                <label class="form-label" for="signup-name">Student Full Name</label>
+                <input type="text" class="form-input" id="signup-name" placeholder="e.g. Aswanth" required>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-label" for="signup-email">Email Address</label>
+                <input type="email" class="form-input" id="signup-email" placeholder="e.g. aswanth@example.com" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="signup-password">Password</label>
+                <input type="password" class="form-input" id="signup-password" placeholder="••••••••" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="signup-track">Preferred Learning Track</label>
+                <select class="form-input" id="signup-track" required style="background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-color);">
+                  <option value="" disabled selected>-- Select a Learning Track --</option>
+                  <option value="1">Software Development</option>
+                  <option value="2">AI Automation</option>
+                  <option value="3">AI Foundations</option>
+                  <option value="4">AI Content Creation</option>
+                </select>
+              </div>
+
+              <div style="margin-top: 1.75rem;">
+                <button class="btn btn-primary" style="width: 100%;" onclick="signupStudent()">
+                  Register & Create Account
+                </button>
+              </div>
+              
+              <div style="text-align: center; margin-top: 1.25rem; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);">Already have an account? </span>
+                <a href="#" style="color: var(--primary); font-weight: 600; text-decoration: none;" onclick="toggleAuthMode('login', event)">Log In</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- FORGOT PASSWORD VIEW -->
+          <div id="forgot-form-view" style="display: none;">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg style="width:20px; height:20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                Reset Password
+              </h3>
+            </div>
+            <div style="max-width: 420px; margin: 0 auto; padding: 1rem 0;">
+              
+              <!-- Step 1: Verify Email -->
+              <div id="forgot-step-email">
+                <div class="form-group">
+                  <label class="form-label" for="forgot-email">Registered Email Address</label>
+                  <input type="email" class="form-input" id="forgot-email" placeholder="e.g. aswanth@example.com" required>
+                </div>
+                <div style="margin-top: 1.75rem;">
+                  <button class="btn btn-primary" style="width: 100%;" onclick="verifyForgotEmail()">
+                    Verify Email Address
+                  </button>
+                </div>
+              </div>
+
+              <!-- Step 2: Reset Password (initially hidden) -->
+              <div id="forgot-step-reset" style="display: none;">
+                <div class="form-group">
+                  <label class="form-label" for="forgot-new-password">New Password</label>
+                  <input type="password" class="form-input" id="forgot-new-password" placeholder="••••••••" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="forgot-confirm-password">Confirm New Password</label>
+                  <input type="password" class="form-input" id="forgot-confirm-password" placeholder="••••••••" required>
+                </div>
+                <div style="margin-top: 1.75rem;">
+                  <button class="btn btn-primary" style="width: 100%;" onclick="resetUserPassword()">
+                    Update Password Securely
+                  </button>
+                </div>
+              </div>
+
+              <div style="text-align: center; margin-top: 1.25rem; font-size: 0.85rem;">
+                <a href="#" style="color: var(--primary); font-weight: 600; text-decoration: none;" onclick="toggleAuthMode('login', event)">Back to Login</a>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Screen 2: Track Selection -->
@@ -233,6 +335,9 @@
                     <h3 class="card-title" id="dashboard-track-name">Track Name</h3>
                   </div>
                   <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;" onclick="switchToTrackSelection()">
+                      Switch Track
+                    </button>
                     <button class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;" onclick="resetDatabaseState()">
                       Reset Track
                     </button>
